@@ -86,6 +86,7 @@ router.get('/all', auth, async (req, res) => {
     const transformedFeedback = await Promise.all(
       feedbackList.map(async (fb) => {
         let userRole = 'Unknown';
+        let repliedByRole = null;
         
         if (fb.userId) {
           try {
@@ -101,6 +102,21 @@ router.get('/all', auth, async (req, res) => {
           }
         }
 
+        // Fetch role of person who replied
+        if (fb.repliedBy) {
+          try {
+            const repliedByUser = await User.findById(fb.repliedBy)
+              .select('role')
+              .lean();
+            
+            if (repliedByUser && repliedByUser.role) {
+              repliedByRole = repliedByUser.role;
+            }
+          } catch (err) {
+            console.error('Error fetching repliedBy role:', fb.repliedBy, err);
+          }
+        }
+
         return {
           _id: fb._id,
           item: fb.item,
@@ -108,6 +124,7 @@ router.get('/all', auth, async (req, res) => {
           comments: fb.comments || '',
           reply: fb.reply || '',
           repliedBy: fb.repliedBy,
+          repliedByRole: repliedByRole,
           repliedAt: fb.repliedAt,
           createdAt: fb.createdAt,
           updatedAt: fb.updatedAt,
@@ -172,6 +189,9 @@ router.post('/:id/reply', auth, async (req, res) => {
       console.error('Error fetching user role:', err);
     }
 
+    // Get role of person who replied (current user)
+    const repliedByRole = user.role;
+
     res.json({ 
       msg: 'Reply sent successfully',
       feedback: {
@@ -181,6 +201,7 @@ router.post('/:id/reply', auth, async (req, res) => {
         comments: feedback.comments,
         reply: feedback.reply,
         repliedBy: feedback.repliedBy,
+        repliedByRole: repliedByRole,
         repliedAt: feedback.repliedAt,
         createdAt: feedback.createdAt,
         updatedAt: feedback.updatedAt,

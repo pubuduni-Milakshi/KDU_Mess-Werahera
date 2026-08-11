@@ -10,7 +10,7 @@ const emailService = require('../utils/emailService');
 
 const router = express.Router();
 
-// ========== VALIDATION HELPER FUNCTIONS ==========
+//  VALIDATION HELPER FUNCTIONS 
 const validateEmail = (email) => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
@@ -193,11 +193,11 @@ router.post('/register', [
       }
     }
 
-    // ========== GENERATE OTP ==========
+    //  GENERATE OTP 
     const otp = generateOTP();
     const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
-    // ========== CREATE USER (NOT VERIFIED YET) ==========
+    // CREATE USER (NOT VERIFIED YET) 
     const userData = { 
       role, 
       roleId, 

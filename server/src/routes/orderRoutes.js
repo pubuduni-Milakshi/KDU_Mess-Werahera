@@ -159,7 +159,7 @@ router.put('/:id/status', authMiddleware, async (req, res) => {
       return res.status(404).json({ msg: 'Order not found' });
     }
 
-    // ✅ NEW: Check if marking as "Served" - only allow on the order date
+    // NEW: Check if marking as "Served" - only allow on the order date
     if (status === 'Served') {
       const orderDate = order.orderDate || order.date;
       if (!orderDate) {

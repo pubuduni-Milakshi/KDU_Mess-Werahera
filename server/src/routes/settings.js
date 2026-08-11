@@ -54,32 +54,90 @@ router.get('/profile', auth, async (req, res) => {
 });
 
 // Update user profile (ONLY mobile number editable)
+// All authenticated users (Day Scholar, Officer Cadet, Admin, Mess Staff) can update their contact
 router.put('/profile', auth, async (req, res) => {
   try {
     let { contact } = req.body;
     
-    const user = await User.findById(req.user.id);
-    if (!user) {
+    console.log('📞 Contact update request:', {
+      userId: req.user.id,
+      contact: contact,
+      contactType: typeof contact
+    });
+    
+    // Check if contact is provided and not empty
+    if (contact === undefined || contact === null || contact === '') {
+      return res.status(400).json({ msg: 'Contact number is required' });
+    }
+
+    // Clean and validate contact number
+    contact = contact.toString().trim().replace(/^\+94/, '').replace(/[\s\-()]/g, '');
+    
+    console.log('📞 Cleaned contact:', contact);
+    
+    // Validate: must be exactly 10 digits
+    if (!/^\d{10}$/.test(contact)) {
+      return res.status(400).json({ 
+        msg: 'Contact number must be exactly 10 digits (numbers only). Example: 0712345678' 
+      });
+    }
+    
+    // Use updateOne for direct update without triggering pre-save hooks
+    // We've already validated the contact format, so we can update directly
+    const updateResult = await User.updateOne(
+      { _id: req.user.id },
+      { $set: { contact: contact } }
+    );
+    
+    if (updateResult.matchedCount === 0) {
+      console.error('❌ User not found for update:', req.user.id);
       return res.status(404).json({ msg: 'User not found' });
     }
-
-    if (contact !== undefined && contact !== null) {
-      contact = contact.toString().replace(/^\+94/, '').replace(/[\s\-()]/g, '');
-      
-      if (!/^\d{10}$/.test(contact)) {
-        return res.status(400).json({ msg: 'Contact number must be exactly 10 digits' });
-      }
-      
-      user.contact = contact;
-    }
-
-    await user.save();
     
+    if (updateResult.modifiedCount === 0) {
+      console.log('⚠️ Contact not modified (might be same value)');
+    }
+    
+    // Fetch updated user to return
     const updatedUser = await User.findById(req.user.id).select('-password');
-    res.json({ msg: 'Profile updated successfully', user: updatedUser });
+    
+    if (!updatedUser) {
+      console.error('❌ Failed to fetch updated user:', req.user.id);
+      return res.status(500).json({ msg: 'Failed to retrieve updated user' });
+    }
+    
+    // Verify the contact was updated correctly
+    if (updatedUser.contact !== contact) {
+      console.error('❌ Contact mismatch after update. Expected:', contact, 'Got:', updatedUser.contact);
+      return res.status(500).json({ msg: 'Contact update verification failed' });
+    }
+    
+    console.log('✅ Contact updated successfully:', updatedUser.contact);
+    
+    res.json({ 
+      msg: 'Contact number updated successfully', 
+      user: updatedUser 
+    });
   } catch (err) {
-    console.error('Error updating profile:', err);
-    res.status(500).json({ msg: 'Server error', error: err.message });
+    console.error('❌ Error updating profile:', err);
+    console.error('Error name:', err.name);
+    console.error('Error message:', err.message);
+    console.error('Error stack:', err.stack);
+    
+    // Handle Mongoose validation errors
+    if (err.name === 'ValidationError') {
+      const errors = Object.values(err.errors).map(e => e.message);
+      console.error('Validation errors:', errors);
+      return res.status(400).json({ 
+        msg: 'Validation error', 
+        errors: errors 
+      });
+    }
+    
+    res.status(500).json({ 
+      msg: 'Server error', 
+      error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error' 
+    });
   }
 });
 

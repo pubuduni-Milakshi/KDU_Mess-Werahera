@@ -249,17 +249,17 @@ userSchema.pre('save', async function(next) {
   next();
 });
 
-// ========== INSTANCE METHOD: Compare Password ==========
+// INSTANCE METHOD: Compare Password 
 userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// ========== INSTANCE METHOD: Get Full Name ==========
+// INSTANCE METHOD: Get Full Name 
 userSchema.methods.getFullName = function() {
   return `${this.firstName} ${this.lastName}`;
 };
 
-// ========== INSTANCE METHOD: Get Role-Specific Info ==========
+//  INSTANCE METHOD: Get Role-Specific Info 
 userSchema.methods.getRoleInfo = function() {
   const info = {
     role: this.role,
@@ -276,12 +276,12 @@ userSchema.methods.getRoleInfo = function() {
   return info;
 };
 
-// ========== STATIC METHOD: Find Users by Role ==========
+//  STATIC METHOD: Find Users by Role 
 userSchema.statics.findByRole = function(role) {
   return this.find({ role: role, isActive: true });
 };
 
-// ========== STATIC METHOD: Search Users ==========
+//  STATIC METHOD: Search Users 
 userSchema.statics.searchUsers = function(searchTerm) {
   const regex = new RegExp(searchTerm, 'i');
   return this.find({
@@ -295,7 +295,7 @@ userSchema.statics.searchUsers = function(searchTerm) {
   });
 };
 
-// ========== INDEXES FOR PERFORMANCE ==========
+//  INDEXES FOR PERFORMANCE 
 userSchema.index({ role: 1, isActive: 1 });
 userSchema.index({ role: 1, status: 1 });
 userSchema.index({ email: 1 });
@@ -303,5 +303,5 @@ userSchema.index({ roleId: 1 });
 userSchema.index({ emailVerificationToken: 1 });
 userSchema.index({ resetPasswordToken: 1 });
 
-// ========== EXPORT MODEL (only define once) ==========
+//  EXPORT MODEL (only define once) 
 module.exports = mongoose.models.User || mongoose.model('User', userSchema);

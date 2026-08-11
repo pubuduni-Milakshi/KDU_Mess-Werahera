@@ -1,0 +1,21 @@
+# Root and nested node_modules
+node_modules/
+client/node_modules/
+server/node_modules/
+
+# Environment variables
+.env
+client/.env
+server/.env
+
+# Build output
+client/build/
+client/dist/
+server/dist/
+
+# Misc
+.DS_Store
+*.log
+
+# User uploaded files
+server/uploads/

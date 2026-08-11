@@ -8,18 +8,33 @@ const auth = require('../../middleware/auth.middleware');
 // Get available dates for booking (next 7 days)
 router.get('/available-dates', auth, async (req, res) => {
   try {
+    const user = await User.findById(req.user.id);
     const dates = [];
     const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
-    for (let i = 1; i <= 7; i++) {
+    // For Day Scholars, start from tomorrow (24-hour advance booking required)
+    // For Officer Cadets, start from today (they can see today's meals)
+    const startDay = user?.role === 'Day Scholar' ? 1 : 0;
+    
+    for (let i = startDay; i <= 7; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() + i);
       date.setHours(0, 0, 0, 0);
       
-      dates.push({
-        date: date.toISOString().split('T')[0],
-        dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()]
-      });
+      // Only include dates that are today or in the future
+      if (date >= today) {
+        // Format date as YYYY-MM-DD using local time to avoid timezone issues
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateString = `${year}-${month}-${day}`;
+        
+        dates.push({
+          date: dateString,
+          dayName: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][date.getDay()]
+        });
+      }
     }
     
     res.json(dates);
@@ -86,6 +101,20 @@ router.post('/create', auth, async (req, res) => {
     else if (mealType === 'Mid-Morning Tea') cutoffTime.setHours(9, 0, 0, 0);
     else if (mealType === 'Evening Tea') cutoffTime.setHours(16, 0, 0, 0);
     else if (mealType === 'Night Tea') cutoffTime.setHours(20, 0, 0, 0);
+
+    // For Day Scholars: Check if booking is at least 24 hours before the meal time
+    // For Officer Cadets: Check if tea booking is at least 24 hours before the tea time
+    if (user.role === 'Day Scholar' || (user.role === 'Officer Cadet' && isTea)) {
+      const now = new Date();
+      const bookingDeadline = new Date(cutoffTime);
+      bookingDeadline.setHours(bookingDeadline.getHours() - 24); // 24 hours before cutoff time
+      
+      if (now >= bookingDeadline) {
+        return res.status(400).json({ 
+          msg: `Cannot book ${mealType}. Bookings must be made at least 24 hours in advance. The deadline for this meal has passed.` 
+        });
+      }
+    }
 
     const order = new Order({
       userId: user._id,
@@ -378,8 +407,28 @@ router.delete('/cancel/:orderId', auth, async (req, res) => {
       return res.status(403).json({ msg: 'This is a compulsory meal and cannot be cancelled.' });
     }
 
+    const user = await User.findById(req.user.id);
     const now = new Date();
-    if (now > order.cutoffTime) {
+    
+    // Check if this is a tea booking
+    const teaTypes = ['Morning Tea', 'Mid-Morning Tea', 'Evening Tea', 'Night Tea'];
+    const isTea = teaTypes.includes(order.mealType);
+    
+    // For Day Scholars: Check if cancellation is at least 24 hours before the meal time
+    // For Officer Cadets: Check if cancellation is at least 24 hours before the tea time (for tea bookings only)
+    if (user && (user.role === 'Day Scholar' || (user.role === 'Officer Cadet' && isTea))) {
+      const cancellationDeadline = new Date(order.cutoffTime);
+      cancellationDeadline.setHours(cancellationDeadline.getHours() - 24); // 24 hours before cutoff time
+      
+      if (now >= cancellationDeadline) {
+        order.cancelledAfterDeadline = true;
+        await order.save();
+        return res.status(400).json({ 
+          msg: 'Cannot cancel - bookings must be cancelled at least 24 hours in advance. The deadline has passed. You will be charged for this booking.' 
+        });
+      }
+    } else if (now > order.cutoffTime) {
+      // For other roles/cases, use the original cutoff time check
       order.cancelledAfterDeadline = true;
       await order.save();
       return res.status(400).json({ 
@@ -423,8 +472,28 @@ router.put('/:id/cancel', auth, async (req, res) => {
       return res.status(403).json({ msg: 'This is a compulsory meal and cannot be cancelled.' });
     }
 
+    const user = await User.findById(req.user.id);
     const now = new Date();
-    if (now > order.cutoffTime) {
+    
+    // Check if this is a tea booking
+    const teaTypes = ['Morning Tea', 'Mid-Morning Tea', 'Evening Tea', 'Night Tea'];
+    const isTea = teaTypes.includes(order.mealType);
+    
+    // For Day Scholars: Check if cancellation is at least 24 hours before the meal time
+    // For Officer Cadets: Check if cancellation is at least 24 hours before the tea time (for tea bookings only)
+    if (user && (user.role === 'Day Scholar' || (user.role === 'Officer Cadet' && isTea))) {
+      const cancellationDeadline = new Date(order.cutoffTime);
+      cancellationDeadline.setHours(cancellationDeadline.getHours() - 24); // 24 hours before cutoff time
+      
+      if (now >= cancellationDeadline) {
+        order.cancelledAfterDeadline = true;
+        await order.save();
+        return res.status(400).json({ 
+          msg: 'Cannot cancel - bookings must be cancelled at least 24 hours in advance. The deadline has passed. You will be charged for this booking.' 
+        });
+      }
+    } else if (now > order.cutoffTime) {
+      // For other roles/cases, use the original cutoff time check
       order.cancelledAfterDeadline = true;
       await order.save();
       return res.status(400).json({ 
